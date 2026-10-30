@@ -1,0 +1,97 @@
+# Captain America: Super Soldier - native PC build via ReXGlue.
+#
+# generated/ is produced from your own default.xex by `rexglue codegen` and is never committed.
+# scripts/build.ps1 does the whole sequence.
+
+cmake_minimum_required(VERSION 3.25)
+project(cass LANGUAGES CXX)
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Written by `rexglue codegen`.
+include(generated/rexglue.cmake)
+
+set(CASS_SOURCES
+    src/main.cpp
+    src/cass_pso_library.cpp      # persistent D3D12 pipeline library (from Judgment)
+    src/cass_fsr.cpp              # SMAA 1x + FSR1 final pass (from Judgment)
+    src/cass_pacing.cpp           # frame limiter + present dedup (from Judgment)
+    src/cass_system_tuning.cpp    # power-throttling opt-out (from Judgment)
+    src/cass_fps_overlay.cpp      # F9 FPS overlay (from Judgment)
+    src/cass_render_size.cpp      # cass_native_720p switch for tools/patch_native_720p.py
+    src/cass_paths.cpp            # cass_game_dir: game folder or .iso without --game_data_root
+    src/cass_iso.cpp              # play straight from the .iso (DiscImageDevice on game:\ / d:\)
+)
+
+if(WIN32)
+    add_executable(cass WIN32 ${CASS_SOURCES})
+else()
+    add_executable(cass ${CASS_SOURCES})
+endif()
+
+# Also stages the SDK runtime DLLs next to cass.exe.
+rexglue_setup_target(cass GPU_PLUGINS xenos)
+
+# Post-codegen patchers rewrite generated/default/*.cpp after `rexglue codegen` and before
+# cass_recomp compiles them, chained by stamps because they edit the same files.
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+set(CASS_GEN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/generated/default)
+set(_cass_prev_stamp ${CASS_GEN_DIR}/codegen.build.stamp)
+macro(cass_patch name script description)
+    set(_stamp ${CASS_GEN_DIR}/${name}.build.stamp)
+    add_custom_command(OUTPUT ${_stamp}
+        COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/${script} ${CASS_GEN_DIR}
+        COMMAND ${CMAKE_COMMAND} -E touch ${_stamp}
+        DEPENDS ${_cass_prev_stamp} ${CMAKE_CURRENT_SOURCE_DIR}/tools/${script}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "${description}"
+        VERBATIM)
+    add_custom_target(cass_${name}_patch DEPENDS ${_stamp})
+    if(TARGET cass_recomp)
+        add_dependencies(cass_recomp cass_${name}_patch)
+    endif()
+    add_dependencies(cass cass_${name}_patch)
+    set(_cass_prev_stamp ${_stamp})
+endmacro()
+
+# Render-size sites -> CassRenderWidth/Height (cass_native_720p, default off).
+cass_patch(native720p patch_native_720p.py "Patching render-size sites (cass_native_720p)")
+
+# Default settings next to cass.exe, copied once so the player's edits are kept.
+if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/cass.toml")
+    file(COPY "${CMAKE_CURRENT_SOURCE_DIR}/config/cass.toml" DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
+endif()
+
+# ---------------------------------------------------------------------------------------------
+# "Captain America Launcher.exe": the settings / launcher window next to cass.exe (Win32 + GDI+,
+# adapted from the Gears of War: Judgment port's launcher/settings.cpp). Static C runtime and only
+# Windows components, so it needs nothing installed. Its "Reset to defaults" uses
+# config/cass.toml as it was at build time.
+# ---------------------------------------------------------------------------------------------
+if(WIN32)
+    enable_language(RC)
+    # clang++ is paired with rc.exe, and CMake's clang rule hands rc.exe clang's preprocessor and
+    # depfile flags, which it rejects: compile the .rc with rc.exe alone (as the Gears 3 port does).
+    set(CMAKE_DEPFILE_FLAGS_RC "")
+    set(CMAKE_RC_COMPILE_OBJECT "<CMAKE_RC_COMPILER> /nologo <DEFINES> <INCLUDES> /fo <OBJECT> <SOURCE>")
+
+    file(READ config/cass.toml CASS_DEFAULT_CONFIG)
+    configure_file(launcher/default_config.h.in ${CMAKE_CURRENT_BINARY_DIR}/launcher_gen/default_config.h @ONLY)
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS config/cass.toml)
+
+    add_executable(cass_launcher WIN32 launcher/settings.cpp launcher/launcher.rc launcher/launcher.manifest)
+    target_include_directories(cass_launcher PRIVATE
+        ${CMAKE_CURRENT_BINARY_DIR}/launcher_gen
+        ${CMAKE_CURRENT_SOURCE_DIR}/launcher)  # rc.exe finds launcher.ico here
+    set_source_files_properties(launcher/launcher.rc PROPERTIES
+        OBJECT_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/launcher/launcher.ico")
+    target_compile_definitions(cass_launcher PRIVATE UNICODE _UNICODE)
+    target_link_libraries(cass_launcher PRIVATE user32 gdi32 gdiplus dwmapi shell32 ole32 comctl32 dxgi)
+    set_target_properties(cass_launcher PROPERTIES
+        OUTPUT_NAME "Captain America Launcher"
+        RUNTIME_OUTPUT_DIRECTORY $<TARGET_FILE_DIR:cass>
+        MSVC_RUNTIME_LIBRARY MultiThreaded)
+    # Not a dependency of cass: an open launcher window would make every game build fail to
+    # relink it. scripts/build.ps1 builds it as a second, non-fatal step.
+endif()

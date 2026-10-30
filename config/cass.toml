@@ -1,0 +1,101 @@
+# Captain America: Super Soldier (PC) settings.
+#
+# This file sits next to cass.exe and is read at start-up, after the GPU plugin loads (so GPU
+# settings work here even though they cannot be set from code early). Command-line flags
+# (--name=value) override it. Comment a line out (#) to get the built-in default back.
+# Values come from what the Gears of War 2 / 3 / Judgment ports measured on the same SDK, plus
+# our own disassembly of this game (out/enhancement_plan.md).
+
+# ---------- Display ----------
+fullscreen = true
+# Borderless (flip model): keeps G-Sync/FreeSync and tearing control working.
+fullscreen_exclusive = false
+
+# Internal render resolution as a multiple of the game's own render size, 1152x648
+# (the console upscales that to 720p):
+# 1 = 1152x648 (original), 2 = 2304x1296 (about 1440p), 3 = 3456x1944 (above 4K, downsampled).
+# 3 gave wrong colours / speckles in Gears 3 and Judgment: try it, go back to 2 if you see that.
+resolution_scale = 2
+
+# Keep resolves (copies of rendered images) correct when resolution_scale is above 1.
+direct_host_resolve = true
+resolve_resolution_scale_fill_half_pixel_offset = true
+mrt_edram_used_range_clamp_to_min = true
+
+# Dither the final 8-bit image to hide banding in skies, smoke and dark rooms.
+present_dither = true
+# Stops alpha-tested foliage / fences flickering on NVIDIA (Judgment uses it).
+use_fuzzy_alpha_epsilon = true
+# The runtime's own FXAA stays off: SMAA below replaces it (FXAA would run before SMAA).
+swap_post_effect = "none"
+
+# Render the 3D scene at 1280x720 instead of the game's 1152x648 (which the console upscales).
+# With it on, resolution_scale 2 = 2560x1440 and 3 = 3840x2160 (true 4K). Experimental: if you
+# see misaligned bloom/blur, a black band, or HUD markers in the wrong place, set it back to false.
+# Restart after changing it.
+cass_native_720p = false
+# With native 720p on, also move the EDRAM bases of the half/quarter-size depth buffers so the
+# larger targets do not overlap. Turn off only to compare a post-processing glitch.
+# cass_native_720p_edram_rebase = true
+
+# ---------- Final image: SMAA + AMD FSR 1.0 ----------
+# SMAA 1x anti-aliasing on the internal image, FSR upscale when the window is larger than the
+# internal image (bilinear otherwise), then FSR RCAS sharpening. cass_fsr = false gives back the
+# runtime's plain bilinear stretch.
+cass_fsr = true
+cass_smaa = true
+# RCAS sharpness reduction in stops: 0 = sharpest, 2 = softest.
+cass_fsr_sharpness = 0.5
+
+# ---------- Frame rate ----------
+# The game asks for vsync every vblank and the runtime fakes a 60 Hz console display, so it runs
+# at up to 60 fps. Raising the faked refresh rate raises the cap. Set it to your monitor's rate.
+# If the game world, cutscenes or physics look too fast above 60, put this back to 60.
+video_mode_refresh_rate = 75
+vsync = true
+# Wait for the monitor's refresh on every frame: no tearing, even frame spacing (our own host
+# vsync; the stock presenter never waits). On a G-Sync/FreeSync monitor you can instead set
+# cass_vsync = false, d3d12_allow_variable_refresh_rate_and_tearing = true and a cass_fps_limit
+# a few fps under the refresh rate, for lower input lag.
+cass_vsync = true
+# Allow tearing (only for VRR monitors, together with cass_vsync = false).
+d3d12_allow_variable_refresh_rate_and_tearing = false
+
+# Frame limiter in fps (0 = off). Frames are released on a fixed high-resolution timer grid,
+# which keeps spacing even. With G-Sync/FreeSync set it a few fps under the monitor's refresh
+# (e.g. 72 for 75 Hz, 141 for 144 Hz). F8 in game toggles it.
+cass_fps_limit = 0
+# Microseconds before each frame slot where the limiter stops sleeping and spins (more precise).
+# cass_fps_limit_spin_us = 1500
+# Skip a host present when the game has not produced a new frame (stale images still repaint every
+# 33 ms so menus animate). Judgment: 51 -> 61 fps and half the worst-case frame time.
+cass_present_dedup = true
+# FPS / frame-time overlay in the top-left corner (F9 toggles it in game).
+cass_fps_overlay = false
+
+# ---------- Textures ----------
+# Anisotropic filtering: 5 = 16x (4 = 8x, 3 = 4x). Sharper floors and walls at an angle.
+anisotropic_override = 5
+# The PC can keep far more textures cached than the console's budget (MB).
+texture_cache_memory_limit_soft = 2048
+texture_cache_memory_limit_hard = 4096
+texture_cache_memory_limit_render_to_texture = 256
+# Keep unused textures longer before evicting them (seconds): fewer reloads, less stutter.
+texture_cache_memory_limit_soft_lifetime = 120
+
+# ---------- Performance ----------
+# Render-target path. "rov" halved GPU time at 2x on an RTX 5080 in the Gears 2 port (NVIDIA/Intel).
+# On AMD use "rtv".
+render_target_path_d3d12 = "rov"
+# Clears no longer copy the whole EDRAM every time (Xenia's default; big win in Gears 2).
+execute_unclipped_draw_vs_on_cpu = true
+# Compile shaders in the background instead of freezing; more threads finish first-time compiles sooner.
+async_shader_compilation = true
+d3d12_pipeline_creation_threads = 16
+# Keep compiled pipelines in <cache dir>/pso_library.bin so later runs skip recompiling them
+# (no repeat-visit stutter). Rebuilt automatically after a driver or GPU change.
+cass_pso_library = true
+
+# Experimental speed-ups, one at a time (revert if textures/geometry go stale or effects break):
+# clear_memory_page_state = false      # Gears 2: 122 -> 240 fps
+# readback_memexport = false           # Gears 3: removed long CPU waits

@@ -1,0 +1,6 @@
+# Function entry points found by booting the game.
+# The runtime logs "call to unregistered function 0x8XXXXXXX" when the game reaches code that
+# codegen missed. Add each address here as `0x8XXXXXXX = {}  # where it was hit`, then rebuild.
+
+[functions]
+0x82226688 = {}  # tail-call target of `b` at 0x82226988 / 0x82226E50 (codegen: unresolved b target)

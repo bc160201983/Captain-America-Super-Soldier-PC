@@ -1,0 +1,6 @@
+# Game files and anything derived from them never go in git.
+game/
+generated/
+out/
+*.xex
+*.iso

@@ -1,0 +1,16 @@
+# Captain America: Super Soldier (Xbox 360) - ReXGlue manifest (SDK 0.10.0).
+# Drives `rexglue codegen`. scripts/build.ps1 runs it.
+
+[project]
+name = "cass"
+sdk_version = "0.10.0"
+game_root = "game"
+
+[entrypoint]
+file_path = "game/default.xex"
+out_directory_path = "generated/default"
+# original.toml: setjmp/longjmp, function hints and FPU hooks from
+#   m1ndcrap/Captain-America-Super-Soldier-Recompiled (SDK 0.4).
+# harvested.toml: missed entry points from tools/harvest_hints.py (vtables, pdata, code pointers).
+# runtime.toml: addresses found by booting the game ("call to unregistered function").
+includes = ["hints/original.toml", "hints/harvested.toml", "hints/runtime.toml"]

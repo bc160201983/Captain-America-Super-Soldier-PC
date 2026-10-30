@@ -1,0 +1,51 @@
+# Ported from m1ndcrap/Captain-America-Super-Soldier-Recompiled (ReXGlue 0.4 config).
+# That build boots to the title screen and crashes entering story mode.
+
+setjmp_address = 0x8267E020
+longjmp_address = 0x8267DD00
+
+[functions]
+0x82216DA0 = {}
+0x822A44F8 = {}
+0x822B25D8 = {}
+0x82316450 = {}
+0x823164A0 = {}
+0x823164F0 = {}
+0x82316540 = {}
+0x82316370 = {}
+0x824C7400 = {}
+0x823162E0 = {}
+0x824C09E8 = {}
+0x822A2050 = {}
+0x822A20C0 = {}
+0x82368E30 = {}
+0x82316328 = {}
+0x822A20E0 = {}
+0x822B2A20 = {}
+0x8231CF60 = {}
+0x8231CF30 = {}
+0x822289F0 = {}
+0x82244A58 = {}
+0x82244AD0 = {}
+0x822A1FB0 = {}
+0x822A21D0 = {}
+0x822A21F0 = {}
+0x822A44E8 = {}
+0x822A20A0 = {}
+0x822A2030 = {}
+
+# Mask host FPU exceptions before code that relies on the console's silent FP behaviour.
+[[midasm_hook]]
+address = 0x824A70F0
+name = "MaskFPUExceptions"
+after_instruction = false
+
+[[midasm_hook]]
+address = 0x824B8D00
+name = "MaskFPUExceptions"
+after_instruction = false
+
+[[midasm_hook]]
+address = 0x824BDB18
+name = "MaskFPUExceptions"
+after_instruction = false

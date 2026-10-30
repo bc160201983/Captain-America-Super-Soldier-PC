@@ -1,0 +1,27 @@
+// Captain America Launcher resources: icon and version information (the file's Properties >
+// Details). launcher.manifest (DPI awareness, visual styles) is embedded by the linker.
+// launcher.ico is a round shield drawn by a script, not taken from the game.
+1 ICON "launcher.ico"
+
+1 VERSIONINFO
+FILEVERSION 1, 0, 0, 0
+PRODUCTVERSION 1, 0, 0, 0
+FILEOS 0x40004
+FILETYPE 0x1
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "FileDescription", "Captain America: Super Soldier (PC) launcher and settings"
+      VALUE "ProductName", "Captain America: Super Soldier (PC)"
+      VALUE "FileVersion", "1.0.0.0"
+      VALUE "ProductVersion", "1.0.0.0"
+      VALUE "OriginalFilename", "Captain America Launcher.exe"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END
