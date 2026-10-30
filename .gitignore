@@ -4,3 +4,5 @@ generated/
 out/
 *.xex
 *.iso
+__pycache__/
+*.pyc
