@@ -1,3 +1,3 @@
-// cass.exe resources. cass.ico is generated at build time by tools/make_game_icon.py from the
-// game's own dashboard tile in default.xex (falls back to launcher/launcher.ico).
+// cass.exe resources. cass.ico is copied from launcher/launcher.ico at build time, or with
+// -DCASS_GAME_ICON=ON made by tools/make_game_icon.py from the game's tile in default.xex.
 1 ICON "cass.ico"
