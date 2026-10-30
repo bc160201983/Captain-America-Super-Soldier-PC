@@ -15,6 +15,7 @@
 #include <rex/rex_app.h>
 #include <rex/ui/window.h>
 
+#include "cass_crash_guard.h"
 #include "cass_fsr.h"
 #include "cass_iso.h"
 #include "cass_pacing.h"
@@ -82,7 +83,11 @@ class CassApp : public rex::ReXApp {
   // ISO mode: swap the stub folder behind game:\ and d:\ for the disc image itself.
   void OnLoadXexImage(std::string& xex_image) override { rex::glue::MountIsoImage(runtime()); }
 
+  // Earliest hook with a logger: crashes during window / D3D12 setup are reported too.
+  void OnPostInitLogging() override { rex::glue::InstallCrashGuard(); }
+
   void OnPreSetup(rex::RuntimeConfig& config) override {
+    rex::glue::InstallCrashGuard();  // idempotent: re-applies this thread's terminate handler
     config.gpu_plugin = "xenos";
     // Settings the original 0.4 port needed to reach the title screen.
     SetGpuFlag("gpu_allow_invalid_fetch_constants", "true");

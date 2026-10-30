@@ -22,6 +22,9 @@ set(CASS_SOURCES
     src/cass_render_size.cpp      # cass_native_720p switch for tools/patch_native_720p.py
     src/cass_paths.cpp            # cass_game_dir: game folder or .iso without --game_data_root
     src/cass_iso.cpp              # play straight from the .iso (DiscImageDevice on game:\ / d:\)
+    src/cass_guest_trap.cpp       # CassGuestTrap / CassGuestUnimplemented for tools/patch_guest_traps.py
+    src/cass_switch_trap.cpp      # jump-table defaults: follow CTR or REX_FATAL (tools/patch_switch_traps.py)
+    src/cass_crash_guard.cpp      # crash guard: abort/terminate/unhandled-exception reports, minidumps, dialog
 )
 
 if(WIN32)
@@ -32,6 +35,9 @@ endif()
 
 # Also stages the SDK runtime DLLs next to cass.exe.
 rexglue_setup_target(cass GPU_PLUGINS xenos)
+
+# MiniDumpWriteDump for src/cass_crash_guard.cpp.
+target_link_libraries(cass PRIVATE dbghelp)
 
 # Post-codegen patchers rewrite generated/default/*.cpp after `rexglue codegen` and before
 # cass_recomp compiles them, chained by stamps because they edit the same files.
@@ -57,6 +63,14 @@ endmacro()
 
 # Render-size sites -> CassRenderWidth/Height (cass_native_720p, default off).
 cass_patch(native720p patch_native_720p.py "Patching render-size sites (cass_native_720p)")
+
+# REX_UNIMPLEMENTED sites (uncaught throw -> silent abort) -> CassGuestTrap (log once per site, continue)
+# or CassGuestUnimplemented (log [FATAL], flush, abort). Fails the build on any unclassifiable site.
+cass_patch(guesttraps patch_guest_traps.py "Patching REX_UNIMPLEMENTED sites (guest traps)")
+
+# Jump-table defaults (`__builtin_trap(); // Switch case out of range`, a silent ud2) -> follow the guest
+# CTR: a label of the same function, a registered function (tail call), else REX_FATAL naming the site.
+cass_patch(switchtraps patch_switch_traps.py "Patching jump-table defaults (switch traps)")
 
 # Default settings next to cass.exe, copied once so the player's edits are kept.
 if(NOT EXISTS "${CMAKE_CURRENT_BINARY_DIR}/cass.toml")
