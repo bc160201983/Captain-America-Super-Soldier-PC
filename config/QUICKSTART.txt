@@ -1,0 +1,23 @@
+Captain America: Super Soldier - native PC port
+Port by BilalReloaded
+YouTube: https://www.youtube.com/@BilalReloaded
+Patreon: https://www.patreon.com/c/bilalreloaded
+
+You need your own copy of the Xbox 360 game (Captain America: Super Soldier, USA/Europe,
+title ID 53450858, base disc version - no title update). No game files are included.
+
+1. Unzip this folder anywhere you can write to (not Program Files).
+2. Start "Captain America Launcher.exe".
+3. Click Browse and pick your game .iso (or default.xex inside an extracted game folder).
+   An .iso placed next to the launcher is found automatically.
+4. Choose your settings and press Play.
+
+Settings are saved in cass.toml next to the game. In game:
+  F4  settings menu        F8  frame limiter on/off
+  F9  FPS overlay          F3  debug overlay
+
+Requirements: Windows 10/11 64-bit, a DirectX 12 GPU.
+NVIDIA/Intel: render path "Auto" picks ROV; AMD picks RTV.
+The first start compiles shaders, so expect a few seconds of stutter that goes away on later runs.
+
+Credits and licenses: THIRD_PARTY_NOTICES.md.
