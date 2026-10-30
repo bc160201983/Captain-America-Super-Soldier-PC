@@ -101,7 +101,32 @@ class CassApp : public rex::ReXApp {
   void OnCreateDialogs(rex::ui::ImGuiDrawer* drawer) override {
     // Runs on the UI thread after the window exists; replaces "cass <SDK build>" in the title bar.
     if (window()) window()->SetTitle("Captain America: Super Soldier  -  Port by BilalReloaded");
+    SetWindowIconFromResource();
     rex::glue::SetFsrImGuiDrawer(drawer);  // FSR stands aside while an ImGui window is on screen
+  }
+
+  // Title-bar and taskbar icon: the exe's icon resource 1 (src/cass.rc), set on every top-level
+  // window of the UI thread (the SDL game window; its handle is private to the SDK).
+  static void SetWindowIconFromResource() {
+    HINSTANCE inst = GetModuleHandleW(nullptr);
+    auto load = [inst](int metric_x, int metric_y) {
+      return static_cast<HICON>(LoadImageW(inst, MAKEINTRESOURCEW(1), IMAGE_ICON, GetSystemMetrics(metric_x),
+                                           GetSystemMetrics(metric_y), LR_DEFAULTCOLOR | LR_SHARED));
+    };
+    // ("small" is a macro in the Windows headers.)
+    static HICON icon_big = load(SM_CXICON, SM_CYICON), icon_small = load(SM_CXSMICON, SM_CYSMICON);
+    if (!icon_big) return;
+    EnumThreadWindows(
+        GetCurrentThreadId(),
+        [](HWND hwnd, LPARAM) -> BOOL {
+          if (!GetParent(hwnd) && IsWindowVisible(hwnd)) {
+            SendMessageW(hwnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(icon_big));
+            SendMessageW(hwnd, WM_SETICON, ICON_SMALL,
+                         reinterpret_cast<LPARAM>(icon_small ? icon_small : icon_big));
+          }
+          return TRUE;
+        },
+        0);
   }
 
   // Called first in ReXApp::OnDestroy, while the D3D12 device and presenter are still alive.

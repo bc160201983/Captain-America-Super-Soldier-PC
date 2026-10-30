@@ -76,6 +76,21 @@ if(WIN32)
     set(CMAKE_DEPFILE_FLAGS_RC "")
     set(CMAKE_RC_COMPILE_OBJECT "<CMAKE_RC_COMPILER> /nologo <DEFINES> <INCLUDES> /fo <OBJECT> <SOURCE>")
 
+    # cass.exe icon: the game's own dashboard tile, taken from your default.xex at build time (no
+    # game art in the repo). Falls back to the launcher's shield when the XEX is not there.
+    set(CASS_ICON ${CMAKE_CURRENT_BINARY_DIR}/cass_gen/cass.ico)
+    add_custom_command(OUTPUT ${CASS_ICON}
+        COMMAND ${Python3_EXECUTABLE} -I ${CMAKE_CURRENT_SOURCE_DIR}/tools/make_game_icon.py
+                ${CMAKE_CURRENT_SOURCE_DIR}/game/default.xex ${CASS_ICON}
+                ${CMAKE_CURRENT_SOURCE_DIR}/launcher/launcher.ico
+        DEPENDS tools/make_game_icon.py tools/dump_xex_image.py launcher/launcher.ico
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Building cass.exe icon from the game's title image"
+        VERBATIM)
+    target_sources(cass PRIVATE src/cass.rc ${CASS_ICON})
+    set_source_files_properties(src/cass.rc PROPERTIES OBJECT_DEPENDS ${CASS_ICON})
+    target_include_directories(cass PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/cass_gen)  # rc.exe finds cass.ico
+
     file(READ config/cass.toml CASS_DEFAULT_CONFIG)
     configure_file(launcher/default_config.h.in ${CMAKE_CURRENT_BINARY_DIR}/launcher_gen/default_config.h @ONLY)
     set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS config/cass.toml)

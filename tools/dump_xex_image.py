@@ -20,18 +20,15 @@ def aes(key: bytes, data: bytes, mode) -> bytes:
     return d.update(data) + d.finalize()
 
 
-def main(xex_path: str, out_dir: str) -> None:
-    x = Path(xex_path).read_bytes()
+def decrypt_image(x: bytes) -> tuple[bytes, int]:
+    """Returns (memory image, load address) of a retail XEX2. Raises ValueError on bad input."""
     if x[:4] != b"XEX2":
-        sys.exit("not an XEX2 file")
+        raise ValueError("not an XEX2 file")
     _flags, pe_off, _res, sec_off, nhdr = struct.unpack_from(">IIIII", x, 4)
     headers = dict(struct.unpack_from(">II", x, 24 + i * 8) for i in range(nhdr))
-
     image_size = struct.unpack_from(">I", x, sec_off + 4)[0]
-    image_flags, load_addr = struct.unpack_from(">II", x, sec_off + 0x10C)
+    load_addr = struct.unpack_from(">I", x, sec_off + 0x110)[0]
     enc_key = x[sec_off + 0x150: sec_off + 0x160]
-    page_count = struct.unpack_from(">I", x, sec_off + 0x180)[0]
-    page_size = 0x1000 if image_flags & 0x10000000 else 0x10000
 
     ffi = headers[FILE_FORMAT_INFO]
     info_size, enc_type, comp_type = struct.unpack_from(">IHH", x, ffi)
@@ -40,7 +37,7 @@ def main(xex_path: str, out_dir: str) -> None:
         session = aes(RETAIL_KEY, enc_key, modes.ECB())
         data = aes(session, data[: len(data) // 16 * 16], modes.CBC(b"\0" * 16))
     elif enc_type != 0:
-        sys.exit(f"unsupported encryption {enc_type}")
+        raise ValueError(f"unsupported encryption {enc_type}")
 
     if comp_type == 1:  # basic: (data_size, zero_size) blocks
         out = bytearray()
@@ -54,10 +51,23 @@ def main(xex_path: str, out_dir: str) -> None:
     elif comp_type == 0:
         image = data
     else:
-        sys.exit(f"unsupported compression {comp_type} (LZX not handled)")
+        raise ValueError(f"unsupported compression {comp_type} (LZX not handled)")
     image = image[:image_size].ljust(image_size, b"\0")
     if image[:2] != b"MZ":
-        sys.exit("decrypted image has no MZ header: wrong key or layout")
+        raise ValueError("decrypted image has no MZ header: wrong key or layout")
+    return image, load_addr
+
+
+def main(xex_path: str, out_dir: str) -> None:
+    x = Path(xex_path).read_bytes()
+    try:
+        image, load_addr = decrypt_image(x)
+    except ValueError as e:
+        sys.exit(str(e))
+    sec_off = struct.unpack_from(">I", x, 0x10)[0]
+    image_flags = struct.unpack_from(">I", x, sec_off + 0x10C)[0]
+    page_count = struct.unpack_from(">I", x, sec_off + 0x180)[0]
+    page_size = 0x1000 if image_flags & 0x10000000 else 0x10000
 
     od = Path(out_dir)
     od.mkdir(parents=True, exist_ok=True)
