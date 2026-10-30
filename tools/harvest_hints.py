@@ -18,7 +18,7 @@ from pathlib import Path
 
 BASE = 0x82000000
 BLR, BCTR = 0x4E800020, 0x4E800420
-SOURCES = ("pdata", "reloc", "datascan", "codeptr", "thunk")
+SOURCES = ("pdata", "reloc", "datascan", "codeptr", "thunk", "gap")
 
 
 class Section:
@@ -138,6 +138,71 @@ def from_thunks(secs):
     return found
 
 
+def is_uncond_exit(word):
+    """blr, bctr, or an unconditional b/ba without link: control never falls through."""
+    return word in (BLR, BCTR) or (word >> 26 == 18 and word & 1 == 0)
+
+
+def decodes_to_exit(md, s, addr, limit, max_len=4096):
+    """True if addr..exit decodes as valid PPC with no zero word, ending in an unconditional exit
+    before `limit`. Guards the gap scan against data (tables, floats) placed in .text."""
+    a = addr
+    while a < limit and a - addr < max_len:
+        word = s.word(a)
+        if word is None or word == 0:
+            return False
+        if not list(md.disasm(s.data[a - s.start: a - s.start + 4], a)):
+            return False
+        if is_uncond_exit(word):
+            return True
+        a += 4
+    return False
+
+
+def from_gaps(secs, registered, labels):
+    """Code no recompiled function covers. For each registered function, its body runs at least to
+    its last internal label; from there the first unconditional exit ends it. Whatever valid code
+    follows before the next registered start was missed by every pointer-based source (e.g. runs of
+    vtable-forwarding thunks reached through computed addresses) and becomes a candidate."""
+    import capstone
+    md = capstone.Cs(capstone.CS_ARCH_PPC, capstone.CS_MODE_32 | capstone.CS_MODE_BIG_ENDIAN)
+    starts = sorted(registered)
+    label_list = sorted(labels)
+    found = []
+    for i, start in enumerate(starts):
+        s = code_section(secs, start)
+        if s is None:
+            continue
+        nxt = starts[i + 1] if i + 1 < len(starts) else s.end
+        nxt = min(nxt, s.end)
+        # furthest internal label of this function (labels between start and the next start)
+        j = bisect.bisect_left(label_list, nxt) - 1
+        a = label_list[j] if j >= 0 and label_list[j] > start else start
+        while a < nxt:  # walk to this function's first unconditional exit after its last label
+            word = s.word(a)
+            if word is None:
+                break
+            a += 4
+            if is_uncond_exit(word):
+                break
+        while a < nxt:  # consecutive orphan blocks up to the next registered function
+            word = s.word(a)
+            if word is None:
+                break
+            if word == 0:  # alignment padding
+                a += 4
+                continue
+            if not decodes_to_exit(md, s, a, nxt):
+                break  # data or something we can't classify: stop, never guess
+            found.append(a)
+            while a < nxt:
+                word = s.word(a)
+                a += 4
+                if is_uncond_exit(word):
+                    break
+    return found
+
+
 def load_generated(gen: Path, project: str):
     registered = {int(m, 16) for m in re.findall(r"SetFunction\(0x([0-9A-Fa-f]+)",
                                                   (gen / f"{project}_register.cpp").read_text())}
@@ -185,7 +250,8 @@ def main():
 
     cands = {}
     for src, fn in (("pdata", from_pdata), ("reloc", from_reloc), ("datascan", from_datascan),
-                    ("codeptr", from_codeptr), ("thunk", from_thunks)):
+                    ("codeptr", from_codeptr), ("thunk", from_thunks),
+                    ("gap", lambda ss: from_gaps(ss, registered, labels))):
         for v in fn(secs):
             cands.setdefault(v, set()).add(src)
 
