@@ -4,7 +4,11 @@
   Captain America Launcher.exe next to it.
 
   1. Runs `rexglue codegen` on game\default.xex (writes generated\).
-  2. Configures CMake (Ninja + clang from Visual Studio) and builds cass.exe.
+  2. Runs the post-codegen patchers (the cass_patch(...) lines in CMakeLists.txt) BEFORE the build
+     starts. Ninja decides what to recompile when it starts, so a file a patcher rewrites in the
+     middle of a build would otherwise keep its old object (this shipped a stale cass.exe once).
+  3. Configures CMake (Ninja + clang from Visual Studio) and builds cass.exe, runs one catch-up
+     pass, then fails if any generated source is still newer than its object.
 
 .PARAMETER Sdk
   ReXGlue SDK folder (contains bin\rexglue.exe). Defaults to ..\tools\rexglue-sdk\win-amd64.
@@ -48,6 +52,18 @@ if (-not $SkipCodegen) {
     if ($LASTEXITCODE -ne 0) { Fail 'rexglue codegen failed (see out\logs\codegen.log).' }
 }
 
+# Post-codegen patchers, in the order CMakeLists.txt chains them (single source of truth).
+# They are idempotent, so the copies Ninja runs later change nothing.
+$python = (Get-Command python -ErrorAction SilentlyContinue).Source
+if (-not $python) { Fail 'python not found (needed for the post-codegen patchers).' }
+$patchers = Select-String -Path CMakeLists.txt -Pattern '^\s*cass_patch\(\s*\S+\s+(\S+\.py)' |
+    ForEach-Object { $_.Matches[0].Groups[1].Value }
+Write-Host "== patch generated code ($($patchers -join ', '))"
+foreach ($p in $patchers) {
+    & $python -I "tools\$p" generated\default
+    if ($LASTEXITCODE -ne 0) { Fail "tools\$p failed." }
+}
+
 $build = "out\build\$($Config.ToLower())"
 Write-Host '== configure'
 cmake -S . -B $build -G Ninja "-DCMAKE_BUILD_TYPE=$Config" `
@@ -58,6 +74,20 @@ if ($LASTEXITCODE -ne 0) { Fail 'CMake configure failed.' }
 Write-Host '== build'
 cmake --build $build --target cass
 if ($LASTEXITCODE -ne 0) { Fail 'Build failed.' }
+# Catch-up pass: recompiles anything a patcher touched during the first pass (normally a no-op).
+cmake --build $build --target cass
+if ($LASTEXITCODE -ne 0) { Fail 'Build failed (catch-up pass).' }
+
+# Never ship a stale exe: every generated source must be older than its object file.
+$objDir = Join-Path $build 'CMakeFiles'
+$objs = @{}
+Get-ChildItem $objDir -Recurse -Filter 'cass_recomp.*.cpp.obj' | ForEach-Object { $objs[$_.Name] = $_.LastWriteTimeUtc }
+$stale = Get-ChildItem generated\default -Filter 'cass_recomp.*.cpp' | Where-Object {
+    $o = $objs["$($_.Name).obj"]
+    (-not $o) -or ($_.LastWriteTimeUtc -gt $o)
+}
+if ($stale) { Fail ("{0} generated source(s) are newer than their objects (e.g. {1}); cass.exe would be stale." -f @($stale).Count, @($stale)[0].Name) }
+Write-Host "Verified: all $($objs.Count) recompiled objects are up to date."
 # The launcher is its own target, so an open launcher window (its exe cannot be overwritten)
 # never breaks the game build.
 cmake --build $build --target cass_launcher
