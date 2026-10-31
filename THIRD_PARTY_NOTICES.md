@@ -7,7 +7,7 @@ below. No game files are included: you need your own copy of the Xbox 360 game.
 |---|---|---|
 | [ReXGlue SDK](https://github.com/rexglue/rexglue-sdk) (`rexruntime.dll`, `rexgpu-xenos.dll`), derived from [Xenia](https://github.com/xenia-project/xenia) | recompiler and Xbox 360 runtime | BSD 3-Clause (Copyright (c) 2015 Ben Vanik and contributors) |
 | [Gears of War: Judgment recomp](https://github.com/OverkillLabs3/gears-judgement-recomp) | launcher, SMAA/FSR pass, pipeline library, frame pacing, FPS overlay, system tuning (adapted) | BSD 3-Clause (Copyright (c) 2026 the contributors to this project) |
-| [Gears of War 2 PC port](https://github.com/santiquiroz/gears-of-war-2-pc-port) | project layout, hint-harvesting method, switch-trap patcher and crash watch (adapted) | BSD 3-Clause (Copyright (c) 2026 Santiago Quiroz Upegui and the gow2-recomp contributors) |
+| [Gears of War 2 PC port](https://github.com/santiquiroz/gears-of-war-2-pc-port) | project layout, hint-harvesting method, switch-trap patcher, crash watch and scripted test input (adapted) | BSD 3-Clause (Copyright (c) 2026 Santiago Quiroz Upegui and the gow2-recomp contributors) |
 | [Gears of War 3 recomp](https://github.com/Flippage/gears-of-war-3-recomp) | host-vsync idea, launcher ideas | BSD 3-Clause (Copyright (c) 2026 Flippage and the gow3-recomp contributors) |
 | [Captain-America-Super-Soldier-Recompiled](https://github.com/m1ndcrap/Captain-America-Super-Soldier-Recompiled) | original function hints and FPU hooks | (no license file) |
 | [AMD FidelityFX Super Resolution 1.0](https://github.com/GPUOpen-Effects/FidelityFX-FSR) | upscaling and sharpening | MIT (Copyright (c) 2021 Advanced Micro Devices, Inc.), see `third_party/fsr1/LICENSE` |

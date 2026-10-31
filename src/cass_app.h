@@ -21,6 +21,7 @@
 #include "cass_pacing.h"
 #include "cass_paths.h"
 #include "cass_pso_library.h"
+#include "cass_test_input.h"
 
 // The Xbox 360 never raises floating point exceptions; the game's code relies on that.
 // Swallow any host FP exception and keep going with all exceptions masked.
@@ -136,7 +137,14 @@ class CassApp : public rex::ReXApp {
 
   // Called first in ReXApp::OnDestroy, while the D3D12 device and presenter are still alive.
   void OnShutdown() override {
+    rex::glue::ShutdownTestInput();  // stop the script thread first
     rex::glue::FlushPsoLibrary();
     rex::glue::ShutdownFsr();
+  }
+
+  // Scripted controller input for automated tests (CASS_TEST_INPUT / cass_test_input; does nothing
+  // unless set). The window exists by now and the guest has not read the pad yet.
+  void OnPreLaunchModule() override {
+    rex::glue::InstallTestInput(window() ? window()->GetNativeWindowHandle() : nullptr);
   }
 };

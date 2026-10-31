@@ -25,6 +25,8 @@ set(CASS_SOURCES
     src/cass_guest_trap.cpp       # CassGuestTrap / CassGuestUnimplemented for tools/patch_guest_traps.py
     src/cass_switch_trap.cpp      # jump-table defaults: follow CTR or REX_FATAL (tools/patch_switch_traps.py)
     src/cass_crash_guard.cpp      # crash guard: abort/terminate/unhandled-exception reports, minidumps, dialog
+    src/cass_test_input.cpp       # scripted pad input for automated tests (CASS_TEST_INPUT; off unless set)
+    src/cass_test_input_hook.cpp  # __imp__XamInputGetState override: runtime export, then the test input
 )
 
 if(WIN32)

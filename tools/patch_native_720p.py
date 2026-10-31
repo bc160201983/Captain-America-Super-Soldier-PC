@@ -14,6 +14,17 @@ buffers sit at hard-coded EDRAM tile bases that only fit the 1152x648-derived ta
 bases are moved as well. Half/quarter/sixteenth colour targets are derived from the Main Set by
 sub_8225AB78 (divw) and need no patch.
 
+Guest memory carve. sub_822B5868 (memory-system init) physically allocates the "Permanent" bump
+arena (object 0x82A0E974, never freed; Alloc sub_8230B420 asserts and still returns the
+out-of-range pointer when full) with `lis 0x12C` = 0x012C0000 (18.75 MiB), then the "Standard"
+heap with `lis 0x1AC4` = 0x1AC40000. The frontbuffer/Color and frontbuffer/Color2 textures
+(sub_822B9E28) and two screen-scaled post-FX textures (sub_8282EFC0) are created in that arena at
+the render size, so at 1280x720 it overflows on the first level load (0x3A9804-byte pool,
+sub_82244390). The two arena-size sites (alloc 0x822B59A4, end = base + r29 at 0x822B5984) become
+calls too, and the host grows the arena. The heap keeps the game's size: it already has to hold
+the larger 720p render targets, and the extra arena bytes come from guest physical memory outside
+the carve (512 MB here, with no console OS reserve and the XEX image outside it).
+
 Every site below becomes a call into src/cass_render_size.cpp, which returns the original value
 unless the cvar cass_native_720p is true. Nothing else in the guest code changes.
 
@@ -31,7 +42,8 @@ import sys
 
 # (guest address, kind, instruction comment ReXGlue writes, comment of the instruction before it)
 # kind: 'w'/'h' integer render width/height (li); 'wf'/'hf' float render width/height (lfs);
-#       'edram' EDRAM tile base of a derived depth buffer (li).
+#       'edram' EDRAM tile base of a derived depth buffer (li);
+#       'arena' Permanent arena size in bytes (lis, value = imm << 16).
 SITES = [
     # sub_822A98E8: boot-time renderer config init (0x82908778), then device creation.
     (0x822A999C, 'w', 'li r10,1152', 'addi r3,r9,-30856'),
@@ -56,10 +68,14 @@ SITES = [
     (0x8225ACBC, 'edram', 'li r8,1264', 'lwz r11,4(r31)'),
     # sub_8225ADC8: "Quarter-size depth buffer" EDRAM base.
     (0x8225AED8, 'edram', 'li r8,972', 'lwz r10,40(r27)'),
+    # sub_822B5868: memory-system init. These are the only two lis 0x12C in the code (0x8289BC2C
+    # is .data). Both must agree: r3 sizes the physical block, r29 sets the arena end.
+    (0x822B5984, 'arena', 'lis r29,300', 'li r10,752'),       # arena size: stack +0x74 (dead), end = base + r29
+    (0x822B59A4, 'arena', 'lis r3,300', 'stw r8,168(r1)'),    # arena physical alloc (sub_824A61C8)
 ]
 
 HOOK = {'w': 'CassRenderWidth', 'h': 'CassRenderHeight', 'edram': 'CassRenderEdramBase',
-        'wf': 'CassRenderWidthF', 'hf': 'CassRenderHeightF'}
+        'wf': 'CassRenderWidthF', 'hf': 'CassRenderHeightF', 'arena': 'CassRenderArenaSize'}
 
 DECL_MARK = '// cass_native_720p: host hooks (tools/patch_native_720p.py)'
 DECL_LINES = [
@@ -70,6 +86,7 @@ DECL_LINES = [
     'extern "C" int CassRenderEdramBase(int orig);',
     'extern "C" float CassRenderWidthF(float orig);',
     'extern "C" float CassRenderHeightF(float orig);',
+    'extern "C" uint32_t CassRenderArenaSize(uint32_t orig);',
 ]
 
 FN_RE = re.compile(r'^DEFINE_REX_FUNC\(sub_([0-9A-F]{8})\)')
@@ -154,6 +171,15 @@ def patch_site(lines, idx, addr, kind, comment, prev, prev_seen):
         k = idx + 1
         orig = '\tctx.%s.s64 = %s;' % (reg, imm)
         new = '\tctx.%s.s64 = %s(%s);' % (reg, hook, imm)
+    elif kind == 'arena':
+        reg, imm = re.match(r'lis (r\d+),(-?\d+)$', comment).groups()
+        value = int(imm) << 16
+        # The hooks take and return uint32_t; a positive value keeps s64 bit-identical.
+        if not 0 < value < 0x80000000:
+            raise PatchError('0x%08X: lis value %d does not fit the uint32_t size hook' % (addr, value))
+        k = idx + 1
+        orig = '\tctx.%s.s64 = %d;' % (reg, value)
+        new = '\tctx.%s.s64 = %s(%d);' % (reg, hook, value)
     else:
         freg = re.match(r'lfs (f\d+),(-?\d+)\((r\d+)\)$', comment).group(1)
         k = None
@@ -178,9 +204,18 @@ def patch_site(lines, idx, addr, kind, comment, prev, prev_seen):
 
 
 def add_decls(lines):
-    if any(l.startswith(DECL_MARK) for l in lines):
-        return False
     eol = '\r\n' if lines and lines[0].endswith('\r\n') else '\n'
+    mark = next((k for k, l in enumerate(lines) if l.startswith(DECL_MARK)), None)
+    if mark is not None:
+        # Block written by an older version of this script: append the declarations it lacks
+        # right after the block, so a re-run on already patched code stays a no-op afterwards.
+        end = mark + 1
+        while end < len(lines) and lines[end].startswith('extern "C" '):
+            end += 1
+        have = {l.rstrip('\r\n') for l in lines[mark + 1:end]}
+        missing = [d for d in DECL_LINES[2:] if d not in have]
+        lines[end:end] = [d + eol for d in missing]
+        return bool(missing)
     last_inc = -1
     for k, l in enumerate(lines):
         if l.startswith('#include'):

@@ -596,7 +596,7 @@ void InitControls() {
                    L"Fullscreen is borderless (flip model), which keeps G-Sync/FreeSync and tearing control working. Windowed opens a normal window."};
   g_c[kDisplay].items = {L"Fullscreen", L"Windowed"};
   g_c[kResolution] = {kResolution, Kind::Segmented, L"Internal resolution",
-                      L"The size the game renders at before it is fitted to your screen. The console rendered 1152x648; 2x and 3x multiply that. 1440p and 4K 3840x2160 also switch the game to native 720p rendering (cass_native_720p), which is EXPERIMENTAL: if you see misaligned bloom or blur, a black band or HUD markers in the wrong place, pick 1296p or ~4K instead."};
+                      L"The size the game renders at before it is fitted to your screen. The console rendered 1152x648; 2x and 3x multiply that. 1440p and 4K 3840x2160 also switch the game to native 720p rendering (cass_native_720p), which is EXPERIMENTAL: a faint ghost copy of the shield (and possibly other glow effects) appears slightly off-place. For a clean image pick 1296p or ~4K, which look almost as sharp."};
   g_c[kResolution].items = {L"Original 1152x648", L"1296p", L"1440p", L"~4K 3456x1944", L"4K 3840x2160"};
   g_c[kResolution].rows = 2;
   g_c[kFiltering] = {kFiltering, Kind::Segmented, L"Texture filtering",
@@ -1151,7 +1151,7 @@ void Paint(HDC hdc, int w, int h) {
       // right-hand note on the label line
       std::wstring note;
       Color note_c = kMuted;
-      if (c.id == kResolution && c.sel >= 0 && kRes[c.sel].native) { note = L"experimental: native 720p"; note_c = kWarn; }
+      if (c.id == kResolution && c.sel >= 0 && kRes[c.sel].native) { note = L"experimental: ghost shield effect"; note_c = kWarn; }
       else if (c.id == kResolution && c.sel < 0) note = L"custom value in cass.toml";
       else if (c.id == kFiltering && c.sel < 0) note = L"custom value in cass.toml";
       else if (c.id == kRenderPath && !g_gpu_name.empty()) note = g_gpu_name;

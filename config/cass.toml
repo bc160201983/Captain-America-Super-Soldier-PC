@@ -30,8 +30,9 @@ use_fuzzy_alpha_epsilon = true
 swap_post_effect = "none"
 
 # Render the 3D scene at 1280x720 instead of the game's 1152x648 (which the console upscales).
-# With it on, resolution_scale 2 = 2560x1440 and 3 = 3840x2160 (true 4K). Experimental: if you
-# see misaligned bloom/blur, a black band, or HUD markers in the wrong place, set it back to false.
+# With it on, resolution_scale 2 = 2560x1440 and 3 = 3840x2160 (true 4K). Experimental: a faint
+# ghost copy of the shield (a glow effect still drawn at the old size) appears slightly off-place.
+# Level loading works (the render memory pool is enlarged to match).
 # Restart after changing it.
 cass_native_720p = false
 # With native 720p on, also move the EDRAM bases of the half/quarter-size depth buffers so the
